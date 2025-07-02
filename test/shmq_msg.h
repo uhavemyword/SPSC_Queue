@@ -5,6 +5,7 @@
 struct Msg
 {
     long ts;
+    long ns;
     char buf[50];
 };
 
