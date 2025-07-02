@@ -17,7 +17,7 @@ int main()
         std::this_thread::sleep_for(std::chrono::seconds(1));
         } });
 
-    if (!cpupin(3))
+    if (!cpupin(5))
     {
         exit(1);
     }
