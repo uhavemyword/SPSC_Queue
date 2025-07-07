@@ -9,6 +9,8 @@
 #include "quill/sinks/ConsoleSink.h"
 #include "quill/sinks/RotatingFileSink.h"
 
+#include "my_clock.h"
+
 int QuillWrapper::backendCpuId;
 
 quill::BackendOptions BuildBackendOptions()
@@ -23,23 +25,36 @@ quill::BackendOptions BuildBackendOptions()
   return backendOptions;
 }
 
+const quill::BackendOptions& GetBackendOptionsOnce()
+{
+  static const quill::BackendOptions backendOptions = BuildBackendOptions();
+  return backendOptions;
+}
+
+MyClock& GetMyClock()
+{
+  static MyClock clock(QuillWrapper::backendCpuId);
+  return clock;
+}
+
 void QuillWrapper::SetupConsoleLogger(const char* logPattern)
 {
   // Start the backend thread
-  quill::BackendOptions backendOptions = BuildBackendOptions();
+  quill::BackendOptions backendOptions = GetBackendOptionsOnce();
   quill::Backend::start(backendOptions);
 
   // Frontend
   auto consoleSink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("console_sink");
 
   quill::Frontend::create_or_get_logger("console_logger", std::move(consoleSink), logPattern,
-                                        "%H:%M:%S.%Qns", quill::Timezone::LocalTime);
+                                        "%H:%M:%S.%Qns", quill::Timezone::LocalTime,
+                                        quill::ClockSourceType::User, &GetMyClock());
 }
 
 void QuillWrapper::CreateFileLogger(const char* loggerName, const char* logFile, int fileLogMaxMB, int fileLogMaxCount)
 {
   // Start the backend thread
-  quill::BackendOptions backendOptions = BuildBackendOptions();
+  quill::BackendOptions backendOptions = GetBackendOptionsOnce();
   quill::Backend::start(backendOptions);
 
   // Frontend
@@ -59,11 +74,13 @@ void QuillWrapper::CreateFileLogger(const char* loggerName, const char* logFile,
     }());
 
   quill::Frontend::create_or_get_logger(loggerName, std::move(rotatingFileSink),
-                                        "%(time),%(message)", "%H:%M:%S.%Qns", quill::Timezone::LocalTime);
+                                        "%(time),%(message)", "%H:%M:%S.%Qns", quill::Timezone::LocalTime,
+                                        quill::ClockSourceType::User, &GetMyClock());
 }
 
 uint64_t QuillWrapper::GetEpochTime()
 {
-  return quill::BackendTscClock::now().time_since_epoch().count();
+  return GetMyClock().now();
+  // return quill::BackendTscClock::now().time_since_epoch().count();
   // return quill::detail::BackendManager::instance().convert_rdtsc_to_epoch_time(quill::detail::rdtsc());
 }
